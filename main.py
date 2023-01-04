@@ -9,13 +9,56 @@ from collections import Counter
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import pandas as pd
-def MI(sequences,i,j):
-    # direct appplication for the rule 
-    Pi = Counter(sequence[i] for sequence in sequences)
-    Pj = Counter(sequence[j] for sequence in sequences)
-    Pij = Counter((sequence[i],sequence[j]) for sequence in sequences)   
 
-    return sum(Pij[(x,y)]*log(Pij[(x,y)]/(Pi[x]*Pj[y])) for x,y in Pij)
+class my_dictionary(dict): 
+    # __init__ function 
+    def __init__(self): 
+        self = dict()   
+    # Function to add key:value 
+    def add(self, key, value): 
+        self[key] = value 
+
+def return_pair(a,b):
+        for x, y in zip(a, b):
+            return x,y
+
+def MI(sequences):
+
+    residue_frequency = my_dictionary() 
+    for i in sequences:
+        for residue in i:
+            if residue in residue_frequency:
+                residue_frequency[residue] +=1
+            else:
+                residue_frequency.add(residue,1)
+
+    for i in range(len(sequences[0])):
+
+        residue = sequences[0][i] + sequences[1][i]
+        if residue in residue_frequency:
+                residue_frequency[residue] +=1
+        else:
+            residue_frequency.add(residue,1)
+
+
+    total_residues =sum(residue_frequency.values())
+    MI=0
+
+
+
+    for i in range(len(sequences)):
+        for j in range(i+1, len(sequences)):
+            x = sequences[i].seq 
+            y = sequences[j].seq 
+            #For percent identity analysis
+            residue1,residue2=return_pair(x,y)
+            p_residue1_residue2 = residue_frequency[residue1+residue2] / total_residues
+            p_residue1 = residue_frequency[residue1] / total_residues
+            p_residue2 = residue_frequency[residue2] / total_residues
+            MI += log(p_residue1_residue2 /(p_residue1*p_residue2))
+
+    normalized_mutual_information = (MI/log(total_residues))
+    return MI, normalized_mutual_information
 
 def stringToList(data):
    return list(data)
@@ -381,7 +424,7 @@ class Ui(QtWidgets.QMainWindow):
             
             # write into the aligned arrays, the nucleotide or added gap 
             # according to the direction in the traceback matrix
-            while(matrix_local[i,j]!=0):
+            while(i > 0 or j > 0):
                 if traceback_matrix[i,j] == diag_dir:
                     aligned_seq1.append(seq1[j-1])
                     aligned_seq2.append(seq2[i-1])
@@ -427,7 +470,7 @@ class Ui(QtWidgets.QMainWindow):
             if self.msa_flag == 1:
                 self.msa_flag = 0
                 output = subprocess.check_output(
-                ["F:\Installations\muscle5.1.win64.exe",
+                ["Installations\muscle5.1.win64.exe",
                 "-align", self.path,
                 "-output", r".\aligned.fasta"],
                 text=True)
@@ -448,11 +491,11 @@ class Ui(QtWidgets.QMainWindow):
                 "-output", r".\aligned.fasta"],
                 text=True)
                 # open the file to display the results of the multiple sequence alignment
-                file = open("aligned.fasta")
+                file = open("user_aligned.fasta")
                 seq = ""
                 for line in file:
                     if line.startswith(">"): 
-                        seq+= "\n\n"
+                        seq+= "\n\n\n"
                         continue
                     seq += line.strip()
                 self.msa_output_line.clear()
@@ -495,7 +538,7 @@ class Ui(QtWidgets.QMainWindow):
                 seq1=sequences[i].seq 
                 seq2=sequences[j].seq 
 
-                    #For percent identity analysis
+                #For percent identity analysis
                 identical_pairs_count,all_pairs_count=compare(seq1,seq2)
                 total_pairs+=all_pairs_count
 
@@ -518,14 +561,16 @@ class Ui(QtWidgets.QMainWindow):
         formatted_PI = "{:.2f}".format(percent_Identity)
         print(formatted_PI)
         
-        out = MI(sequences_matrix,seq_len,seq_len)
+        mutual_information, normalized_mutual_information = MI(sequences)
 
 
 
-        formatted_mi = "{:.2f}".format(out)
+        formatted_mi = "{:.2f}".format(mutual_information)
+        formatted_norm_mi = "{:.2f}".format(normalized_mutual_information)
         
         if flag == True:
             self.lcd_mutual_information.display(formatted_mi)
+            self.lcdNumber.display(formatted_norm_mi)
             self.lcd_percent_identity.display(formatted_PI)
             self.lcd_sum_of_pairs.display(formatted_SOP)
 
